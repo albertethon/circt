@@ -11,7 +11,9 @@
 #define CONVERSION_IMPORTVERILOG_IMPORTVERILOGINTERNALS_H
 
 #include "circt/Conversion/ImportVerilog.h"
+#include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/Moore/MooreOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "slang/ast/ASTVisitor.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/Support/Debug.h"
@@ -63,6 +65,27 @@ struct Context {
   // Convert an expression AST node to MLIR ops.
   Value convertExpression(const slang::ast::Expression &expr);
 
+  // Convert a slang timing control into an MLIR timing control.
+  LogicalResult
+  visitTimingControl(const slang::ast::TimingControl *timingControl);
+
+  LogicalResult visitDelay(const slang::ast::DelayControl *delay);
+  LogicalResult visitDelay3(const slang::ast::Delay3Control *delay3);
+  LogicalResult
+  visitSignalEvent(const slang::ast::SignalEventControl *signalEventControl);
+  LogicalResult
+  visitImplicitEvent(const slang::ast::ImplicitEventControl *implEventControl);
+  LogicalResult visitRepeatedEvent(
+      const slang::ast::RepeatedEventControl *repeatedEventControl);
+  LogicalResult
+  visitOneStepDelay(const slang::ast::OneStepDelayControl *oneStepDelayControl);
+  LogicalResult
+  visitCycleDelay(const slang::ast::CycleDelayControl *cycleDelayControl);
+
+  void pushLValue(mlir::Value *lval);
+  void popLValue();
+  mlir::Value *getTopLValue() const;
+
   mlir::ModuleOp intoModuleOp;
   const slang::SourceManager &sourceManager;
   SmallDenseMap<slang::BufferID, StringRef> &bufferFilePaths;
@@ -71,7 +94,6 @@ struct Context {
   OpBuilder builder;
   /// A symbol table of the MLIR module we are emitting into.
   SymbolTable symbolTable;
-
   /// The top-level operations ordered by their Slang source location. This is
   /// used to produce IR that follows the source file order.
   std::map<slang::SourceLocation, Operation *> orderedRootOps;
@@ -88,6 +110,9 @@ struct Context {
       llvm::ScopedHashTable<const slang::ast::ValueSymbol *, Value>;
   using ValueSymbolScope = ValueSymbols::ScopeTy;
   ValueSymbols valueSymbols;
+
+private:
+  std::vector<mlir::Value *> lvalueStack;
 };
 
 } // namespace ImportVerilog

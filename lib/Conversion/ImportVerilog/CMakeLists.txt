@@ -33,6 +33,7 @@ add_circt_translation_library(CIRCTImportVerilog
   ImportVerilog.cpp
   Statements.cpp
   Structure.cpp
+  TimingControl.cpp
   Types.cpp
 
   DEPENDS
@@ -40,7 +41,9 @@ add_circt_translation_library(CIRCTImportVerilog
 
   LINK_LIBS PUBLIC
   CIRCTMoore
+  CIRCTHW
   MLIRTranslateLib
+  MLIRSCFDialect
   PRIVATE
   slang_slang
 )
