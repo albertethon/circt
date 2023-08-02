@@ -68,6 +68,14 @@ module MultiPackedRangeDim;
   logic [0:5][2:0] v1;
 endmodule
 
+// CHECK-LABEL: moore.module @MultiPackedRangeDim
+module MultiPackedRangeDim;
+  // CHECK-NEXT: %v0 = moore.variable : !moore.packed<range<range<logic, 2:0>, 5:0>>
+  // CHECK-NEXT: %v1 = moore.variable : !moore.packed<range<range<logic, 2:0>, 0:5>>
+  logic [5:0][2:0] v0;
+  logic [0:5][2:0] v1;
+endmodule
+
 // CHECK-LABEL: moore.module @PackedRangeDim
 module PackedRangeDim;
   // CHECK-NEXT: %d0 = moore.variable : !moore.packed<range<logic, 2:0>>
@@ -76,3 +84,12 @@ module PackedRangeDim;
   logic [0:2] d1;
 endmodule
 
+// CHECK-LABEL: moore.module @RealType
+module RealType;
+  // CHECK-NEXT: %d0 = moore.variable : !moore.real
+  // CHECK-NEXT: %d1 = moore.variable : !moore.realtime
+  // CHECK-NEXT: %d2 = moore.variable : !moore.shortreal
+  real d0;
+  realtime d1;
+  shortreal d2;
+endmodule
