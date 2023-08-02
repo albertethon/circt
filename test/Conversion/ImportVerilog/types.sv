@@ -63,15 +63,22 @@ endmodule
 // CHECK-LABEL: moore.module @MultiPackedRangeDim
 module MultiPackedRangeDim;
   // CHECK-NEXT: %v0 = moore.variable : !moore.packed<range<range<logic, 2:0>, 5:0>>
-  // CHECK-NEXT: %v1 = moore.variable : !moore.packed<range<range<logic, 2:0>, 5:0>>
+  // CHECK-NEXT: %v1 = moore.variable : !moore.packed<range<range<logic, 2:0>, 0:5>>
   logic [5:0][2:0] v0;
   logic [0:5][2:0] v1;
 endmodule
 
-// CHECK-LABEL: moore.module @MultiPackedRangeDim
-module MultiPackedRangeDim;
-  // CHECK-NEXT: %v0 = moore.variable : !moore.packed<range<range<logic, 2:0>, 5:0>>
-  // CHECK-NEXT: %v1 = moore.variable : !moore.packed<range<range<logic, 2:0>, 0:5>>
+// CHECK-LABEL: moore.module @MultiUnpackedUnsizedDim
+module MultiUnpackedUnsizedDim;
+  // CHECK-NEXT: %v0 = moore.variable : !moore.unpacked<unsized<unsized<logic>>>
+  logic v0 [][];
+endmodule
+
+// CHECK-LABEL: moore.module @UnpackedUnsizedDim
+module UnpackedUnsizedDim;
+  // CHECK-NEXT: %d0 = moore.variable : !moore.unpacked<unsized<logic>>
+  logic d0 [];
+  // CHECK-NEXT: %v1 = moore.variable : !moore.packed<range<range<logic, 2:0>, 5:0>>
   logic [5:0][2:0] v0;
   logic [0:5][2:0] v1;
 endmodule
