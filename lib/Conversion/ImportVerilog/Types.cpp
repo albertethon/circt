@@ -109,6 +109,20 @@ struct TypeVisitor {
         packedInnerType, moore::Range(type.range.left, type.range.right));
   }
 
+  Type visit(const slang::ast::FixedSizeUnpackedArrayType &type) {
+    auto innerType = type.elementType.visit(*this);
+    if (!innerType)
+      return {};
+    auto unpackedInnerType = dyn_cast<moore::UnpackedType>(innerType);
+    if (!unpackedInnerType) {
+      mlir::emitError(loc, "dynamic unpacked array; ")
+          << type.elementType.toString() << " is fixed size unpacked";
+      return {};
+    }
+    return moore::UnpackedRangeDim::get(
+        unpackedInnerType, moore::Range(type.range.left, type.range.right));
+  }
+
   Type visit(const slang::ast::DynamicArrayType &type) {
     auto innerType = type.elementType.visit(*this);
     if (!innerType)
@@ -116,7 +130,7 @@ struct TypeVisitor {
     auto unpackedInnerType = dyn_cast<moore::UnpackedType>(innerType);
     if (!unpackedInnerType) {
       mlir::emitError(loc, "fixed size unpacked array; ")
-          << type.elementType.toString() << "is dynamic size unpacked";
+          << type.elementType.toString() << " is dynamic size unpacked";
       return {};
     }
     return moore::UnpackedUnsizedDim::get(unpackedInnerType);
