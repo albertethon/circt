@@ -1,10 +1,6 @@
 
 #include "ImportVerilogInternals.h"
-#include "mlir/IR/Value.h"
-#include "mlir/Support/LogicalResult.h"
 #include "slang/ast/ASTVisitor.h"
-#include <slang/ast/expressions/MiscExpressions.h>
-#include <slang/ast/symbols/VariableSymbols.h>
 
 using namespace circt;
 using namespace ImportVerilog;
@@ -16,9 +12,21 @@ struct ExprVisitor {
   Location loc;
   ExprVisitor(Context &context, Location loc) : context(context), loc(loc), builder(context.rootBuilder) {}
   mlir::OpBuilder builder;
+
+  //----------------------------------------------------------------------------------
+  //Literal Expressions visit
+  //----------------------------------------------------------------------------------
+
+  ///XXX: visit IntegerLiteral and build constantOp, VariableDeclOp
   Value visit(const slang::ast::IntegerLiteral &expr,const slang::ast::VariableSymbol &var){
     Type tmpType = context.convertType(*var.getDeclaredType());
     uint32_t value = expr.getValue().as<uint32_t>().value();
+    // if declare a constant type
+    if(var.flags.has(slang::ast::VariableFlags::Const)){
+      return builder.create<moore::ConstantOp>(loc,
+                    tmpType,
+                    value);
+    }
     return builder.create<moore::VariableDeclOp>(loc,
                     moore::LValueType::get(tmpType),
                     builder.getStringAttr(var.name),
