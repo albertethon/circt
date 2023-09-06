@@ -12,13 +12,16 @@
 #include "circt/Conversion/ImportVerilog.h"
 #include "circt/Dialect/Moore/MooreOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Value.h"
 #include "slang/ast/Compilation.h"
 #include "slang/ast/Definition.h"
 #include "slang/syntax/SyntaxTree.h"
 #include "slang/syntax/SyntaxVisitor.h"
 #include "slang/text/SourceManager.h"
+#include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/Support/Debug.h"
 #include <queue>
+#include <slang/ast/symbols/VariableSymbols.h>
 
 #define DEBUG_TYPE "import-verilog"
 
@@ -48,6 +51,7 @@ struct Context {
   /// generally a good idea to pass in a location.
   Type convertType(const slang::ast::Type &type, LocationAttr loc = {});
   Type convertType(const slang::ast::DeclaredType &type);
+  void convertExpr(const slang::ast::VariableSymbol &var, LocationAttr loc);
 
   LogicalResult convertCompilation();
   Operation *convertModuleHeader(const slang::ast::InstanceBodySymbol *module);
@@ -62,6 +66,13 @@ struct Context {
   OpBuilder rootBuilder;
   /// A symbol table of the MLIR module we are emitting into.
   SymbolTable symbolTable;
+  /// The symbol table maps a variable name to a value in the current scope.
+  /// Entering a convertModuleBody creates a new scope, and the function arguments are
+  /// added to the mapping. When the processing of a function is terminated, the
+  /// scope is destroyed and the mappings created in this scope are dropped.
+  llvm::ScopedHashTable<llvm::StringRef, mlir::Value> varSymbolTable;
+  using SymbolTableScopeT =
+    llvm::ScopedHashTableScope<StringRef,mlir::Value>;
 
   /// How we have lowered modules to MLIR.
   DenseMap<const slang::ast::InstanceBodySymbol *, Operation *> moduleOps;
