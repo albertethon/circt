@@ -19,6 +19,7 @@
 #include "slang/text/SourceManager.h"
 #include "llvm/Support/Debug.h"
 #include <queue>
+#include <slang/ast/symbols/VariableSymbols.h>
 
 #define DEBUG_TYPE "import-verilog"
 
@@ -48,6 +49,7 @@ struct Context {
   /// generally a good idea to pass in a location.
   Type convertType(const slang::ast::Type &type, LocationAttr loc = {});
   Type convertType(const slang::ast::DeclaredType &type);
+  void convertExpr(const slang::ast::VariableSymbol &var, LocationAttr loc);
 
   LogicalResult convertCompilation();
   Operation *convertModuleHeader(const slang::ast::InstanceBodySymbol *module);
