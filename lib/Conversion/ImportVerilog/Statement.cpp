@@ -96,7 +96,8 @@ Context::convertStatement(const slang::ast::Statement *statement) {
   case slang::ast::StatementKind::EventTrigger:
     return mlir::emitError(loc, "unsupported statement: event trigger");
   case slang::ast::StatementKind::ProceduralAssign:
-    return mlir::emitError(loc, "unsupported statement: procedural assign");
+    visitExpression(&statement->as<slang::ast::ProceduralAssignStatement>().assignment);
+    break;
   case slang::ast::StatementKind::ProceduralDeassign:
     return mlir::emitError(loc, "unsupported statement: procedural deassign");
   case slang::ast::StatementKind::RandCase:

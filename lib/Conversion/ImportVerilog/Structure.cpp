@@ -15,6 +15,7 @@
 #include "slang/ast/types/AllTypes.h"
 #include "slang/ast/types/Type.h"
 #include "slang/syntax/SyntaxVisitor.h"
+#include "llvm/ADT/StringRef.h"
 
 using namespace circt;
 using namespace ImportVerilog;
@@ -106,6 +107,10 @@ Context::convertModuleBody(const slang::ast::InstanceBodySymbol *module) {
   auto builder =
       OpBuilder::atBlockEnd(&cast<moore::SVModuleOp>(moduleOp).getBodyBlock());
 
+  // Create a new scope in a module. When the processing of a module is terminated, the
+  // scope is destroyed and the mappings created in this scope are dropped.
+  SymbolTableScopeT varScope(varSymbolTable);
+
   for (auto &member : module->members()) {
     LLVM_DEBUG(llvm::dbgs()
                << "- Handling " << slang::ast::toString(member.kind) << "\n");
@@ -137,9 +142,36 @@ Context::convertModuleBody(const slang::ast::InstanceBodySymbol *module) {
       auto loweredType = convertType(*varAst->getDeclaredType());
       if (!loweredType)
         return failure();
-      builder.create<moore::VariableOp>(convertLocation(varAst->location),
-                                        loweredType,
-                                        builder.getStringAttr(varAst->name));
+      auto *init = (varAst->getInitializer());
+      if(init){
+        // variable initialization
+        rootBuilder.setInsertionPointToEnd(builder.getBlock());
+        Value value;
+        if(init->as_if<slang::ast::IntegerLiteral>()){
+          auto srcValue = init->as<slang::ast::IntegerLiteral>().getValue().as<uint32_t>().value();
+          value = builder.create<moore::VariableDeclOp>(convertLocation(varAst->location),
+                                                moore::LValueType::get(loweredType),
+                                                varAst->name,
+                                                srcValue);
+        }else{
+          auto rhs = visitExpression(init);
+          value = builder.create<moore::VariableOp>(convertLocation(varAst->location),
+                                            loweredType,
+                                            builder.getStringAttr(varAst->name));
+          builder.create<moore::BPAssignOp>(loc, value,rhs);
+        }
+        varSymbolTable.insert(varAst->name,{value,init});
+        
+      }
+      else{
+        // variable declared, not defined
+        auto value = 
+        builder.create<moore::VariableOp>(convertLocation(varAst->location),
+                                          loweredType,
+                                          builder.getStringAttr(varAst->name));
+        // name->{op,null} means not defined variable, which can't be used as rvalue
+        varSymbolTable.insert(varAst->name, {value,nullptr});
+      }
       continue;
     }
 
@@ -157,7 +189,7 @@ Context::convertModuleBody(const slang::ast::InstanceBodySymbol *module) {
     // Handle AssignOp.
     if (auto *assignAst = member.as_if<slang::ast::ContinuousAssignSymbol>()) {
       rootBuilder.setInsertionPointToEnd(builder.getBlock());
-      visitAssignmentExpr(
+      visitContinuousAssignmentExpr(
           &assignAst->getAssignment().as<slang::ast::AssignmentExpression>());
       continue;
     }

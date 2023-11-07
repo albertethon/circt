@@ -19,6 +19,7 @@
 #include "slang/syntax/SyntaxTree.h"
 #include "slang/syntax/SyntaxVisitor.h"
 #include "slang/text/SourceManager.h"
+#include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/Support/Debug.h"
 #include <queue>
 
@@ -69,6 +70,16 @@ struct Context {
   visitAssignmentExpr(const slang::ast::AssignmentExpression *assignmentExpr);
   Value visitConversion(const slang::ast::ConversionExpression *conversionExpr,
                         const slang::ast::Type &type);
+  Value visitContinuousAssignmentExpr(const slang::ast::AssignmentExpression *assignmentExpr);
+  /// The symbol table maps a variable name to a value in the current scope.
+  /// Entering a module creates a new scope, and the arguments are
+  /// added to the mapping. When the processing of a module is terminated, the
+  /// scope is destroyed and the mappings created in this scope are dropped.
+  llvm::ScopedHashTable<StringRef, std::pair<mlir::Value, const slang::ast::Expression *>>
+      varSymbolTable;
+  using SymbolTableScopeT =
+      llvm::ScopedHashTableScope<StringRef,
+                                 std::pair<mlir::Value, const slang::ast::Expression *>>;
 
   mlir::ModuleOp intoModuleOp;
   const slang::SourceManager &sourceManager;
