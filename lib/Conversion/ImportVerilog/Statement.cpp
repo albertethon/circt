@@ -8,9 +8,12 @@
 
 #include "ImportVerilogInternals.h"
 #include "slang/ast/ASTVisitor.h"
+#include "slang/ast/Statements.h"
 #include "slang/ast/Symbol.h"
+#include "slang/ast/expressions/AssignmentExpressions.h"
 #include "slang/ast/symbols/CompilationUnitSymbols.h"
 #include "slang/ast/symbols/InstanceSymbols.h"
+#include "slang/ast/symbols/MemberSymbols.h"
 #include "slang/ast/symbols/VariableSymbols.h"
 #include "slang/ast/types/AllTypes.h"
 #include "slang/ast/types/Type.h"
@@ -96,7 +99,8 @@ Context::convertStatement(const slang::ast::Statement *statement) {
   case slang::ast::StatementKind::EventTrigger:
     return mlir::emitError(loc, "unsupported statement: event trigger");
   case slang::ast::StatementKind::ProceduralAssign:
-    return mlir::emitError(loc, "unsupported statement: procedural assign");
+    visitExpression(&statement->as<slang::ast::ProceduralAssignStatement>().assignment);
+    break;
   case slang::ast::StatementKind::ProceduralDeassign:
     return mlir::emitError(loc, "unsupported statement: procedural deassign");
   case slang::ast::StatementKind::RandCase:

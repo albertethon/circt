@@ -8,9 +8,12 @@
 
 #include "ImportVerilogInternals.h"
 #include "slang/ast/ASTVisitor.h"
+#include "slang/ast/Expression.h"
+#include "slang/ast/Statements.h"
 #include "slang/ast/Symbol.h"
 #include "slang/ast/symbols/CompilationUnitSymbols.h"
 #include "slang/ast/symbols/InstanceSymbols.h"
+#include "slang/ast/symbols/MemberSymbols.h"
 #include "slang/ast/symbols/VariableSymbols.h"
 #include "slang/ast/types/AllTypes.h"
 #include "slang/ast/types/Type.h"
@@ -31,28 +34,90 @@ Value Context::visitIntegerLiteral(
 // Detail processing about named value.
 Value Context::visitNamedValue(
     const slang::ast::NamedValueExpression *namedValueExpr) {
-  // TODO:
-  return nullptr;
+    auto loc = convertLocation(namedValueExpr->sourceRange.start());
+    llvm::StringRef varname(namedValueExpr->getSymbolReference()->name);
+    auto [value,expression] = varSymbolTable.lookup(varname);
+    if(value){
+      return value;
+    }
+    mlir::emitError(loc, "error: unknow variable '")
+      << namedValueExpr->getSymbolReference()->name << "'";
+    return nullptr;
 }
 
-// Detail processing about assignment.
+// Detail processing about procedural assignment.
 Value Context::visitAssignmentExpr(
     const slang::ast::AssignmentExpression *assignmentExpr) {
   auto loc = convertLocation(assignmentExpr->sourceRange.start());
   Value lhs = visitExpression(&assignmentExpr->left());
+  Value rhs;
   if (!lhs)
     return nullptr;
-  Value rhs = visitExpression(&assignmentExpr->right());
-  if (!rhs)
-    return nullptr;
-  // TODO:
-  if (assignmentExpr->right().as_if<slang::ast::NamedValueExpression>()) {
-    mlir::emitError(loc, "unsupported assignment of kind like a = b");
-    return nullptr;
+  // assign a=b;
+  // check b is defined
+  if(assignmentExpr->right().as_if<slang::ast::NamedValueExpression>()){
+    auto rhs_varname = assignmentExpr->right().getSymbolReference()->name;
+    auto rhs_pair = varSymbolTable.lookup(rhs_varname);
+    rhs = rhs_pair.first;
+    const slang::ast::Expression* rhs_expr = rhs_pair.second;
+
+    if(rhs_expr==nullptr){
+      //TODO: implicit declaration is not allowed
+      mlir::emitError(loc, "error: undefined variable '")
+      << rhs_varname << "'";
+    }
   }
-  rootBuilder.create<moore::AssignOp>(loc, lhs, rhs);
-  return nullptr;
+  else{
+    rhs = visitExpression(&assignmentExpr->right());
+    if (!rhs)
+      return nullptr;
+  }
+  // assign the rhs's operation and expr to varname in lhs
+  auto varname = assignmentExpr->left().getSymbolReference()->name;
+  varSymbolTable.insert(varname,{rhs,&assignmentExpr->right()});
+
+  if(assignmentExpr->isNonBlocking()){
+    rootBuilder.create<moore::PAssignOp>(loc, lhs, rhs);
+  }else{
+    rootBuilder.create<moore::BPAssignOp>(loc, lhs, rhs);
+  }
+  return lhs;
 }
+
+// Detail processing about continuous assignment.
+Value Context::visitContinuousAssignmentExpr(
+    const slang::ast::AssignmentExpression *assignmentExpr){
+  auto loc = convertLocation(assignmentExpr->sourceRange.start());
+  Value lhs = visitExpression(&assignmentExpr->left());
+  Value rhs;
+  if (!lhs)
+    return nullptr;
+  // assign a=b;
+  // check b is defined
+  if(assignmentExpr->right().as_if<slang::ast::NamedValueExpression>()){
+    auto rhs_varname = assignmentExpr->right().getSymbolReference()->name;
+    auto rhs_pair = varSymbolTable.lookup(rhs_varname);
+    rhs = rhs_pair.first;
+    const slang::ast::Expression* rhs_expr = rhs_pair.second;
+
+    if(rhs_expr==nullptr){
+      //TODO: implicit declaration is not allowed
+      mlir::emitError(loc, "error: undefined variable '")
+      << rhs_varname << "'";
+    }
+  }
+  else{
+    rhs = visitExpression(&assignmentExpr->right());
+    if (!rhs)
+      return nullptr;
+  }
+  // assign the rhs's operation and expr to varname in lhs
+  auto varname = assignmentExpr->left().getSymbolReference()->name;
+  varSymbolTable.insert(varname,{rhs,&assignmentExpr->right()});
+
+  rootBuilder.create<moore::AssignOp>(loc, lhs, rhs);
+  return lhs;
+    }
 
 // Detail processing about conversion
 Value Context::visitConversion(
