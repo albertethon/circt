@@ -107,8 +107,7 @@ struct Context {
   /// added to the mapping. When the processing of a module is terminated, the
   /// scope is destroyed and the mappings created in this scope are dropped.
   llvm::ScopedHashTable<StringRef, mlir::Value> varSymbolTable;
-  using SymbolTableScopeT =
-      llvm::ScopedHashTableScope<StringRef, mlir::Value>;
+  using SymbolTableScopeT = llvm::ScopedHashTableScope<StringRef, mlir::Value>;
   /// How we have lowered modules to MLIR.
   DenseMap<const slang::ast::InstanceBodySymbol *, Operation *> moduleOps;
   /// A list of modules for which the header has been created, but the body has

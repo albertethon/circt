@@ -107,8 +107,9 @@ Context::convertModuleBody(const slang::ast::InstanceBodySymbol *module) {
   auto builder =
       OpBuilder::atBlockEnd(&cast<moore::SVModuleOp>(moduleOp).getBodyBlock());
 
-  // Create a new scope in a module. When the processing of a module is terminated, the
-  // scope is destroyed and the mappings created in this scope are dropped.
+  // Create a new scope in a module. When the processing of a module is
+  // terminated, the scope is destroyed and the mappings created in this scope
+  // are dropped.
   SymbolTableScopeT varScope(varSymbolTable);
 
   for (auto &member : module->members()) {
