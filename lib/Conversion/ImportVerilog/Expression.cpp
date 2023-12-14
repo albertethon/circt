@@ -198,6 +198,9 @@ Value Context::visitAssignmentExpr(
     if (assignmentExpr->syntax->parent->kind ==
         slang::syntax::SyntaxKind::ContinuousAssign)
       rootBuilder.create<moore::CAssignOp>(loc, lhs, rhs);
+    else if (assignmentExpr->syntax->parent->kind ==
+             slang::syntax::SyntaxKind::ProceduralAssignStatement)
+      rootBuilder.create<moore::PCAssignOp>(loc, lhs, rhs);
     else
       rootBuilder.create<moore::BPAssignOp>(loc, lhs, rhs);
   }
