@@ -82,10 +82,68 @@ Context::convertStatement(const slang::ast::Statement *statement) {
     return mlir::emitError(loc, "unsupported statement: repeat loop");
   case slang::ast::StatementKind::ForeachLoop:
     return mlir::emitError(loc, "unsupported statement: foreach loop");
-  case slang::ast::StatementKind::WhileLoop:
-    return mlir::emitError(loc, "unsupported statement: while loop");
-  case slang::ast::StatementKind::DoWhileLoop:
-    return mlir::emitError(loc, "unsupported statement: do while loop");
+  case slang::ast::StatementKind::WhileLoop: {
+    const auto &whileStmt = &statement->as<slang::ast::WhileLoopStatement>();
+    auto loc = convertLocation(whileStmt->sourceRange.start());
+    mlir::SmallVector<mlir::Type> types;
+    auto type = convertType(*whileStmt->cond.type, loc);
+
+    auto whileOp = builder.create<mlir::scf::WhileOp>(
+        loc, types, mlir::SmallVector<Value, 0>{});
+    OpBuilder::InsertionGuard guard(builder);
+
+    // The before-region of the WhileOp.
+    Block *before = builder.createBlock(&whileOp.getBefore());
+    builder.setInsertionPointToEnd(before);
+    Value cond = convertExpression(whileStmt->cond);
+    if (!cond)
+      return failure();
+
+    cond = builder.create<moore::BoolCastOp>(loc, cond);
+    cond = builder.create<moore::ConversionOp>(loc, builder.getI1Type(), cond);
+    // TODO: The above should probably be a `moore.bit_to_i1` op.
+
+    builder.create<mlir::scf::ConditionOp>(loc, cond, before->getArguments());
+
+    // The after-region of the WhileOp.
+    Block *after = builder.createBlock(&whileOp.getAfter());
+    builder.setInsertionPointToStart(after);
+
+    auto succeeded = convertStatement(&whileStmt->body);
+    builder.create<mlir::scf::YieldOp>(loc);
+    return succeeded.success();
+  }
+  case slang::ast::StatementKind::DoWhileLoop: {
+    const auto &whileStmt = &statement->as<slang::ast::DoWhileLoopStatement>();
+    auto loc = convertLocation(whileStmt->sourceRange.start());
+    mlir::SmallVector<mlir::Type> types;
+    auto type = convertType(*whileStmt->cond.type, loc);
+
+    auto whileOp = builder.create<mlir::scf::WhileOp>(
+        loc, types, mlir::SmallVector<Value, 0>{});
+    OpBuilder::InsertionGuard guard(builder);
+
+    // The before-region of the WhileOp.
+    Block *before = builder.createBlock(&whileOp.getBefore());
+    builder.setInsertionPointToEnd(before);
+
+    auto succeeded = convertStatement(&whileStmt->body);
+    Value cond = convertExpression(whileStmt->cond);
+    if (!cond)
+      return failure();
+    cond = builder.create<moore::BoolCastOp>(loc, cond);
+    cond = builder.create<moore::ConversionOp>(loc, builder.getI1Type(), cond);
+    // TODO: The above should probably be a `moore.bit_to_i1` op.
+
+    builder.create<mlir::scf::ConditionOp>(loc, cond, before->getArguments());
+
+    // The after-region of the WhileOp.
+    Block *after = builder.createBlock(&whileOp.getAfter());
+    builder.setInsertionPointToStart(after);
+
+    builder.create<mlir::scf::YieldOp>(loc);
+    return succeeded.success();
+  }
   case slang::ast::StatementKind::ForeverLoop:
     return mlir::emitError(loc, "unsupported statement: forever loop");
   case slang::ast::StatementKind::Timed:
