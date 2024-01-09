@@ -56,6 +56,8 @@ struct Context {
   LogicalResult convertCompilation(slang::ast::Compilation &compilation);
   Operation *convertModuleHeader(const slang::ast::InstanceBodySymbol *module);
   LogicalResult convertModuleBody(const slang::ast::InstanceBodySymbol *module);
+  LogicalResult
+  convertStatementBlock(const slang::ast::StatementBlockSymbol *stmt);
 
   // Convert a slang statement into an MLIR statement.
   LogicalResult convertStatement(const slang::ast::Statement *statement);
