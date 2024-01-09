@@ -44,3 +44,25 @@ module dowhile_tb ();
 		end while(i != 2); 
 	end
 endmodule
+
+// CHECK-LABEL: moore.module @for_tb
+module for_tb ();
+	// CHECK:   [[TMP0:%.+]] = moore.constant 0 : !moore.int
+	// CHECK:   %i = moore.variable [[TMP0]] : !moore.int
+	// CHECK: scf.while : () -> () {
+	// CHECK:   [[TMP1:%.+]] = moore.constant 2 : !moore.int
+	// CHECK:   [[TMP2:%.+]] = moore.lt %i, [[TMP1]] : !moore.int -> !moore.bit
+	// CHECK:   [[TMP3:%.+]] = moore.bool_cast [[TMP2]] : !moore.bit -> !moore.bit
+	// CHECK:   [[TMP4:%.+]] = moore.conversion [[TMP3]] : !moore.bit -> i1
+	// CHECK:   scf.condition([[TMP4]])
+	// CHECK: } do {
+	// CHECK:   [[TMP1:%.+]] = moore.constant 1 : !moore.int
+	// CHECK:   [[TMP2:%.+]] = moore.add %i, [[TMP1]] : !moore.int
+	// CHECK:   moore.bpassign %i, [[TMP2]] : !moore.int
+	// CHECK:   scf.yield
+	// CHECK: }
+	initial begin
+        for(int i=0;i<2;++i)begin
+        end
+	end
+endmodule
