@@ -66,3 +66,23 @@ module for_tb ();
         end
 	end
 endmodule
+
+// CHECK-LABEL:   moore.module @repeat_tb {
+// CHECK: [[TMP1:%.*]] = moore.variable {{%.+}} : !moore.int
+// CHECK: moore.procedure initial {
+// CHECK:   scf.while ([[TMP0:%.*]] = [[TMP1]]) : (!moore.int) -> !moore.int {
+// CHECK:     [[TMP2:%.+]] = moore.bool_cast [[TMP1]] : !moore.int -> !moore.bit
+// CHECK:     [[TMP3:%.+]] = moore.conversion [[TMP2]] : !moore.bit -> i1
+// CHECK:     scf.condition([[TMP3]]) [[TMP0]] : !moore.int
+// CHECK:   } do {
+// CHECK:   ^bb0([[TMP4:%.+]]: !moore.int):
+// CHECK:     [[TMP2:%.+]] = moore.constant 1 : !moore.int
+// CHECK:     [[TMP3:%.+]] = moore.sub [[TMP4]], [[TMP2]] : !moore.int
+// CHECK:     scf.yield [[TMP3]] : !moore.int
+module repeat_tb ();
+	int a = 10;
+	initial begin
+		repeat(a)begin
+		end
+	end
+endmodule
