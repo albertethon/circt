@@ -138,8 +138,41 @@ Context::convertStatement(const slang::ast::Statement *statement) {
     builder.create<mlir::scf::YieldOp>(loc);
     return succeeded.success();
   }
-  case slang::ast::StatementKind::RepeatLoop:
-    return mlir::emitError(loc, "unsupported statement: repeat loop");
+  case slang::ast::StatementKind::RepeatLoop: {
+    const auto &whileStmt = &statement->as<slang::ast::RepeatLoopStatement>();
+    auto loc = convertLocation(whileStmt->sourceRange.start());
+    auto type = convertType(*whileStmt->count.type, loc);
+    Value countExpr = convertExpression(whileStmt->count);
+    if (!countExpr)
+      return failure();
+    auto whileOp = builder.create<mlir::scf::WhileOp>(loc, type, countExpr);
+
+    // The before-region of the WhileOp.
+    Block *before = builder.createBlock(&whileOp.getBefore(), {}, type, loc);
+
+    builder.setInsertionPointToEnd(before);
+    Value cond;
+    if (!countExpr.getType().isa<mlir::IntegerType>()) {
+      auto zeroValue = builder.create<moore::ConstantOp>(loc, type, 0);
+      cond = builder.create<moore::InEqualityOp>(loc, countExpr, zeroValue);
+    }
+    builder.create<mlir::scf::ConditionOp>(loc, cond, before->getArguments());
+
+    // The after-region of the WhileOp.
+    Block *after = builder.createBlock(&whileOp.getAfter(), {}, type, loc);
+    builder.setInsertionPointToStart(after);
+
+    auto succeeded = convertStatement(&whileStmt->body);
+
+    // count decrement
+    auto one = builder.create<moore::ConstantOp>(loc, type, 1);
+    auto count = after->getArgument(0);
+    auto result = builder.create<moore::SubOp>(loc, count, one);
+
+    builder.create<mlir::scf::YieldOp>(loc, result->getResults());
+
+    return succeeded.success();
+  }
   case slang::ast::StatementKind::ForeachLoop:
     return mlir::emitError(loc, "unsupported statement: foreach loop");
   case slang::ast::StatementKind::WhileLoop: {
