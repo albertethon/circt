@@ -62,9 +62,6 @@ struct Context {
   // Convert a slang statement into an MLIR statement.
   LogicalResult convertStatement(const slang::ast::Statement *statement);
 
-  LogicalResult
-  visitConditionalStmt(const slang::ast::ConditionalStatement *conditionalStmt);
-
   // Convert a slang expression into an MLIR expression.
   Value convertExpression(const slang::ast::Expression &expr);
 
