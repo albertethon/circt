@@ -142,6 +142,52 @@ struct StmtVisitor {
     return succeeded.success();
   }
 
+  // Unroll ForeachLoop into nested for loops, parse the body in the innermost
+  // layer, and break out to the outermost layer.
+  LogicalResult visit(const slang::ast::ForeachLoopStatement &foreachStmt) {
+    // auto array = context.convertExpression(foreachStmt.arrayRef);
+
+    // Store unrolled loops in Dimension order
+    SmallVector<mlir::scf::ForOp> loops;
+    Context::SymbolTableScopeT varScope(context.varSymbolTable);
+
+    auto step =
+        builder.create<mlir::arith::ConstantIndexOp>(loc, 1).getResult();
+
+    for (auto &dimension : foreachStmt.loopDims) {
+      // Skip null dimension loopVar between i,j in foreach(array[i, ,j,k])
+      if (!dimension.loopVar)
+        continue;
+      auto lb = builder
+                    .create<mlir::arith::ConstantIndexOp>(
+                        loc, dimension.range->lower())
+                    .getResult();
+      auto ub = builder.create<mlir::arith::ConstantIndexOp>(
+          loc, dimension.range->upper());
+
+      auto forOp = builder.create<mlir::scf::ForOp>(loc, lb, ub, step,
+                                                    mlir::SmallVector<Value>());
+
+      // Remember the iterator variable in each loops
+      context.varSymbolTable.insert(dimension.loopVar->name,
+                                    forOp->getOperand(0));
+
+      builder.setInsertionPointToStart(&forOp->getRegion(0).front());
+      loops.push_back(forOp);
+    }
+
+    if (!foreachStmt.body.bad()) {
+      if (foreachStmt.body.visit(*this).failed())
+        return failure();
+    }
+
+    loops.pop_back_n(loops.size() - 1);
+    auto outermostFor = loops.back();
+    builder.setInsertionPointAfter(outermostFor);
+
+    return success();
+  }
+
   LogicalResult visit(const slang::ast::RepeatLoopStatement &repeatStmt) {
     auto type = context.convertType(*repeatStmt.count.type, loc);
     Value countExpr = context.convertExpression(repeatStmt.count);

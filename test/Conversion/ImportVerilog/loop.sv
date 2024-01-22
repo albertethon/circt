@@ -86,3 +86,32 @@ module repeat_tb ();
 		end
 	end
 endmodule
+
+// CHECK-LABEL: moore.module @TestForeach {
+// CHECK:    [[TMP0:%.+]] = arith.constant 1 : index
+// CHECK:    [[TMP1:%.+]] = arith.constant 0 : index
+// CHECK:    [[TMP0_0:%.+]] = arith.constant 1 : index
+// CHECK:    scf.for {{%.+}} = [[TMP1]] to [[TMP0_0]] step [[TMP0]] {
+// CHECK:      [[TMP1_0:%.+]] = arith.constant 0 : index
+// CHECK:      [[TMP2:%.+]] = arith.constant 3 : index
+// CHECK:      scf.for {{%.+}} = [[TMP1_0]] to [[TMP2]] step [[TMP0]] {
+// CHECK:        [[TMP3:%.+]] = moore.constant 1 : !moore.int
+// CHECK:        [[TMP4:%.+]] = moore.add %a, [[TMP3]] : !moore.int
+// CHECK:        moore.bpassign %a, [[TMP4]] : !moore.int
+// CHECK:      }
+// CHECK:    }
+// CHECK:    [[TMP3:%.+]] = moore.constant 1 : !moore.int
+// CHECK:    [[TMP4:%.+]] = moore.add %a, [[TMP3]] : !moore.int
+// CHECK:    moore.bpassign %a, [[TMP4]] : !moore.int
+// CHECK:  }
+// CHECK:}
+module TestForeach;
+bit array[2][4][4][4];
+int a;
+initial begin
+    foreach (array[i, ,m,]) begin
+        a++;
+    end
+    a++;
+end
+endmodule
