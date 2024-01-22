@@ -40,7 +40,6 @@ add_circt_translation_library(CIRCTImportVerilog
   CIRCTMoore
   MLIRTranslateLib
   MLIRSCFDialect
-  MLIRArithDialect
   PRIVATE
   slang_slang
 )
