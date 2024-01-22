@@ -12,7 +12,6 @@
 
 #include "circt/Conversion/ImportVerilog.h"
 #include "circt/Dialect/Moore/MooreOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "slang/ast/ASTVisitor.h"
