@@ -158,45 +158,92 @@ struct StmtVisitor {
   // Unroll ForeachLoop into nested for loops, parse the body in the innermost
   // layer, and break out to the outermost layer.
   LogicalResult visit(const slang::ast::ForeachLoopStatement &foreachStmt) {
-    // auto array = context.convertExpression(foreachStmt.arrayRef);
 
     // Store unrolled loops in Dimension order
-    SmallVector<mlir::scf::ForOp> loops;
+    SmallVector<mlir::scf::WhileOp> loops;
     Context::SymbolTableScopeT varScope(context.varSymbolTable);
-
-    auto step =
-        builder.create<mlir::arith::ConstantIndexOp>(loc, 1).getResult();
-
+    auto type = moore::IntType::get(context.getContext(), moore::IntType::Int);
+    auto step = builder.create<moore::ConstantOp>(loc, type, 1);
     for (auto &dimension : foreachStmt.loopDims) {
       // Skip null dimension loopVar between i,j in foreach(array[i, ,j,k])
       if (!dimension.loopVar)
         continue;
-      auto lb = builder
-                    .create<mlir::arith::ConstantIndexOp>(
-                        loc, dimension.range->lower())
-                    .getResult();
-      auto ub = builder.create<mlir::arith::ConstantIndexOp>(
-          loc, dimension.range->upper());
 
-      auto forOp = builder.create<mlir::scf::ForOp>(loc, lb, ub, step,
-                                                    mlir::SmallVector<Value>());
+      // lower bound
+      builder.create<moore::ConstantOp>(loc, type, dimension.range->lower());
+      // uppper bound
+
+      auto ub = builder.create<moore::ConstantOp>(loc, type,
+                                                  dimension.range->upper());
+      auto index = builder.create<moore::ConstantOp>(loc, type,
+                                                     dimension.range->lower());
+
+      // insert nested whileOp in after region
+      if (!loops.empty())
+        builder.setInsertionPointToEnd(loops.back().getAfterBody());
+      auto whileOp = builder.create<mlir::scf::WhileOp>(
+          loc, mlir::SmallVector<mlir::Type>{type},
+          mlir::SmallVector<Value, 1>{index});
+
+      // The before-region of the WhileOp.
+      Block *before = builder.createBlock(&whileOp.getBefore(), {}, type, loc);
+      builder.setInsertionPointToEnd(before);
+
+      // Check if index overflows
+      Value cond;
+      if (dimension.range->lower() <= dimension.range->upper()) {
+        cond = builder.create<moore::LtOp>(loc, index, ub);
+      } else {
+        cond = builder.create<moore::GeOp>(loc, index, ub);
+      }
+
+      cond =
+          builder.create<moore::ConversionOp>(loc, builder.getI1Type(), cond);
+      builder.create<mlir::scf::ConditionOp>(loc, cond, before->getArguments());
 
       // Remember the iterator variable in each loops
       context.varSymbolTable.insert(dimension.loopVar->name,
-                                    forOp->getOperand(0));
+                                    before->getArgument(0));
 
-      builder.setInsertionPointToStart(&forOp->getRegion(0).front());
-      loops.push_back(forOp);
+      // The after-region of the WhileOp.
+      Block *after = builder.createBlock(&whileOp.getAfter(), {}, type, loc);
+      builder.setInsertionPointToStart(after);
+      loops.push_back(whileOp);
     }
 
+    // gen body in innermost block
     if (!foreachStmt.body.bad()) {
       if (foreachStmt.body.visit(*this).failed())
         return failure();
     }
 
-    loops.pop_back_n(loops.size() - 1);
-    auto outermostFor = loops.back();
-    builder.setInsertionPointAfter(outermostFor);
+    // gen index iteration in the end
+    for (auto it = foreachStmt.loopDims.rbegin();
+         it != foreachStmt.loopDims.rend(); ++it) {
+      if (!it->loopVar)
+        continue;
+      auto whileOp = loops.back();
+      if (!whileOp.getAfter().hasOneBlock()) {
+        mlir::emitError(loc, "no block in while after region");
+        return failure();
+      }
+
+      builder.setInsertionPointToEnd(whileOp.getAfterBody());
+      auto index = whileOp.getAfterArguments().back();
+      Value afterIndex;
+      if (it->range->lower() <= it->range->upper()) {
+        // step ++
+        afterIndex = builder.create<moore::AddOp>(loc, index, step);
+      } else {
+        // step --
+        afterIndex = builder.create<moore::SubOp>(loc, index, step);
+      }
+
+      builder.create<mlir::scf::YieldOp>(
+          loc, mlir::SmallVector<Value, 1>{afterIndex});
+      builder.setInsertionPointAfter(whileOp);
+      loops.pop_back();
+    }
 
     return success();
   }
